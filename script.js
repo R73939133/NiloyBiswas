@@ -230,3 +230,185 @@ cards.forEach(card => {
 window.addEventListener('load', () => {
     document.body.classList.add('loaded');
 });
+
+// ===== AUTO-SWAPPING CAROUSEL FOR SECTIONS =====
+function initCarousel(gridSelector, intervalTime = 4000) {
+    const grid = document.querySelector(gridSelector);
+    if (!grid) return;
+
+    const cards = Array.from(grid.children);
+    if (cards.length <= 1) return;
+
+    // Create carousel wrapper
+    const carouselWrapper = document.createElement('div');
+    carouselWrapper.className = 'carousel-wrapper';
+
+    // Create carousel track
+    const carouselTrack = document.createElement('div');
+    carouselTrack.className = 'carousel-track';
+
+    // Move cards to track
+    cards.forEach(card => {
+        card.classList.add('carousel-slide');
+        carouselTrack.appendChild(card);
+    });
+
+    // Calculate visible cards based on screen width
+    function getVisibleCards() {
+        if (window.innerWidth >= 1024) return 3;
+        if (window.innerWidth >= 769) return 2;
+        return 1;
+    }
+
+    function getMaxIndex() {
+        const visibleCards = getVisibleCards();
+        return Math.max(0, cards.length - visibleCards);
+    }
+
+    // Create indicators based on actual slides
+    const indicators = document.createElement('div');
+    indicators.className = 'carousel-indicators';
+
+    function updateIndicators() {
+        indicators.innerHTML = '';
+        const maxIndex = getMaxIndex();
+        for (let i = 0; i <= maxIndex; i++) {
+            const dot = document.createElement('button');
+            dot.className = 'carousel-dot' + (i === currentIndex ? ' active' : '');
+            dot.setAttribute('aria-label', `Go to slide ${i + 1}`);
+            dot.addEventListener('click', () => goToSlide(i));
+            indicators.appendChild(dot);
+        }
+    }
+
+    // Create nav arrows
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'carousel-nav carousel-prev';
+    prevBtn.innerHTML = '‹';
+    prevBtn.setAttribute('aria-label', 'Previous slide');
+    prevBtn.addEventListener('click', () => changeSlide(-1));
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'carousel-nav carousel-next';
+    nextBtn.innerHTML = '›';
+    nextBtn.setAttribute('aria-label', 'Next slide');
+    nextBtn.addEventListener('click', () => changeSlide(1));
+
+    // Assemble carousel
+    carouselWrapper.appendChild(carouselTrack);
+    carouselWrapper.appendChild(indicators);
+    carouselWrapper.appendChild(prevBtn);
+    carouselWrapper.appendChild(nextBtn);
+
+    // Replace grid with carousel
+    grid.parentNode.replaceChild(carouselWrapper, grid);
+
+    let currentIndex = 0;
+    let autoPlayInterval;
+    let isHovered = false;
+
+    function getSlideWidth() {
+        const visibleCards = getVisibleCards();
+        return 100 / visibleCards;
+    }
+
+    function updateSlide() {
+        const slideWidth = getSlideWidth();
+        carouselTrack.style.transform = `translateX(-${currentIndex * slideWidth}%)`;
+        // Update dots
+        const dots = indicators.querySelectorAll('.carousel-dot');
+        dots.forEach((dot, i) => {
+            dot.classList.toggle('active', i === currentIndex);
+        });
+    }
+
+    function goToSlide(index) {
+        const maxIndex = getMaxIndex();
+        currentIndex = Math.min(index, maxIndex);
+        updateSlide();
+        resetAutoPlay();
+    }
+
+    function changeSlide(direction) {
+        const maxIndex = getMaxIndex();
+        currentIndex = currentIndex + direction;
+        if (currentIndex < 0) currentIndex = maxIndex;
+        if (currentIndex > maxIndex) currentIndex = 0;
+        updateSlide();
+        resetAutoPlay();
+    }
+
+    function autoPlay() {
+        if (!isHovered) {
+            const maxIndex = getMaxIndex();
+            currentIndex = (currentIndex + 1) > maxIndex ? 0 : currentIndex + 1;
+            updateSlide();
+        }
+    }
+
+    function startAutoPlay() {
+        autoPlayInterval = setInterval(autoPlay, intervalTime);
+    }
+
+    function resetAutoPlay() {
+        clearInterval(autoPlayInterval);
+        startAutoPlay();
+    }
+
+    // Pause on hover
+    carouselWrapper.addEventListener('mouseenter', () => {
+        isHovered = true;
+    });
+
+    carouselWrapper.addEventListener('mouseleave', () => {
+        isHovered = false;
+    });
+
+    // Touch/swipe support
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    carouselWrapper.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    carouselWrapper.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        handleSwipe();
+    }, { passive: true });
+
+    function handleSwipe() {
+        const swipeThreshold = 50;
+        const diff = touchStartX - touchEndX;
+        if (Math.abs(diff) > swipeThreshold) {
+            if (diff > 0) {
+                changeSlide(1); // Swipe left
+            } else {
+                changeSlide(-1); // Swipe right
+            }
+        }
+    }
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+        const maxIndex = getMaxIndex();
+        if (currentIndex > maxIndex) {
+            currentIndex = maxIndex;
+        }
+        updateIndicators();
+        updateSlide();
+    });
+
+    // Initial setup
+    updateIndicators();
+    startAutoPlay();
+}
+
+// Initialize carousels when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    // Initialize carousels for all screen sizes
+    initCarousel('.experience-grid', 4000);
+    initCarousel('.papers-grid', 5000);
+    initCarousel('.projects-grid', 4000);
+    initCarousel('.skills-grid', 3500);
+});
